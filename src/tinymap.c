@@ -37,6 +37,11 @@ void tm_context_set_heightmap(TM_MapContext *ctx, TM_HeightMap *heightmap) {
     ctx->heightmap = heightmap;
 }
 
+void tm_context_handle_event(TM_MapContext *ctx, Event e) {
+    if (!ctx) return;
+    tm_viewport_handle_event(&ctx->viewport, e);
+}
+
 static void render_background(renderContext *rc, Color bg) {
     if (!rc || !rc->frame_buffer) return;
     frameBuffer *fb = rc->frame_buffer;

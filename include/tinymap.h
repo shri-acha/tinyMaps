@@ -55,9 +55,20 @@ TM_Viewport tm_viewport_create(int screen_w, int screen_h);
 void        tm_viewport_pan(TM_Viewport *vp, float dx, float dy);
 void        tm_viewport_zoom(TM_Viewport *vp, float factor);
 void        tm_viewport_center_on(TM_Viewport *vp, float x, float y);
+void        tm_viewport_handle_event(TM_Viewport *vp, Event e);
 
 Point2  tm_world_to_screen(const TM_Viewport *vp, TM_Vec2 world_pos);
 TM_Vec2 tm_screen_to_world(const TM_Viewport *vp, Point2 screen_pos);
+
+/*
+ * GLFW-compatible key tokens used by the event handler.  They are defined here
+ * so tinyMap itself can stay independent of GLFW while still interpreting the
+ * events emitted by tinyGraphics' GLFW backend.
+ */
+#define TM_KEY_LEFT   263
+#define TM_KEY_RIGHT  262
+#define TM_KEY_UP     265
+#define TM_KEY_DOWN   264
 
 typedef enum {
     TM_MAP_ORTHOGONAL = 0,
@@ -145,6 +156,7 @@ void           tm_context_destroy(TM_MapContext *ctx);
 void           tm_context_set_tilemap(TM_MapContext *ctx, TM_TileMap *tilemap);
 void           tm_context_set_vectormap(TM_MapContext *ctx, TM_VectorMap *vectormap);
 void           tm_context_set_heightmap(TM_MapContext *ctx, TM_HeightMap *heightmap);
+void           tm_context_handle_event(TM_MapContext *ctx, Event e);
 void           tm_context_render(TM_MapContext *ctx);
 
 #ifdef __cplusplus

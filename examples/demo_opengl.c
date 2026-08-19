@@ -1,50 +1,56 @@
 #include "tinymap.h"
-#include "gl_ext.h"
 #include <GLFW/glfw3.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 
-#define WINDOW_WIDTH  800
-#define WINDOW_HEIGHT 600
+#define WINDOW_WIDTH  1920
+#define WINDOW_HEIGHT 1080
 
-static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-    (void)scancode; (void)mods;
-    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-        glfwSetWindowShouldClose(window, GLFW_TRUE);
+static TM_MapContext *g_map_ctx = NULL;
+static tinyWindow *g_window = NULL;
+
+static void handle_event(Event e) {
+    if (e.ev_typ == KEYBOARD && e.ke.state == DOWN && e.ke.keycode == 256 /* GLFW_KEY_ESCAPE */) {
+        if (g_window) {
+            glfwSetWindowShouldClose((GLFWwindow*)g_window->handle, GLFW_TRUE);
+        }
+        return;
     }
+
+    tm_context_handle_event(g_map_ctx, e);
 }
 
 int main(void) {
-    if (!glfwInit()) {
-        fprintf(stderr, "Failed to initialize GLFW\n");
-        return -1;
-    }
-
-    GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "tinyMap - OpenGL Viewer", NULL, NULL);
-    if (!window) {
-        glfwTerminate();
-        return -1;
-    }
-
-    glfwMakeContextCurrent(window);
-    glfwSwapInterval(1);
-    glfwSetKeyCallback(window, key_callback);
-
     frameBuffer *fb = createFrameBuffer(WINDOW_WIDTH, WINDOW_HEIGHT);
+    if (!fb) {
+        fprintf(stderr, "Failed to create frame buffer\n");
+        return -1;
+    }
+
     renderContext rc = {
         .frame_buffer = fb,
         .render_mode = FILLED,
         .origin = (Index){ .x = 0, .y = 0, .z = 0 },
         .scene_context = NULL,
-        .projection = ORTHOGRAPHIC
+        .projection = ORTHOGRAPHIC,
+        .camera_position = (Point3){ .x = 0, .y = 0, .z = 0 }
     };
 
-    GLuint textureID;
-    TINY_GL_INIT_TEXTURE(fb, textureID);
+    registerEventHandler(&rc, handle_event);
+
+    tinyWindow *window = tinyCreateWindow(tinyGetGLFWBackend(), WINDOW_WIDTH, WINDOW_HEIGHT,
+                                          "tinyMap - OpenGL Viewer", &rc, NULL);
+    if (!window) {
+        fprintf(stderr, "Failed to create window\n");
+        destroyFrameBuffer(fb);
+        return -1;
+    }
 
     /* Setup Map Context */
     TM_MapContext *ctx = tm_context_create(&rc, WINDOW_WIDTH, WINDOW_HEIGHT);
+    g_map_ctx = ctx;
+    g_window = window;
 
     /* 1. Create TileMap (40x30 tiles, 20px each) */
     TM_TileMap *tilemap = tm_tilemap_create(40, 30, 20, TM_MAP_ORTHOGONAL);
@@ -108,25 +114,31 @@ int main(void) {
     tm_context_set_vectormap(ctx, vmap);
 
     printf("=========================================\n");
-    printf("  tinyMap OpenGL Viewer (Press ESC to quit)\n");
+    printf("  tinyMap OpenGL Viewer\n");
+    printf("  WASD / Arrow Keys : Pan\n");
+    printf("  +/-               : Zoom\n");
+    printf("  Left Click        : Center on position\n");
+    printf("  Right Click       : Zoom in\n");
+    printf("  ESC               : Quit\n");
     printf("=========================================\n");
 
     /* Main Render Loop */
-    while (!glfwWindowShouldClose(window)) {
+    while (!tinyWindowShouldClose(window)) {
         /* Render map to frameBuffer */
         tm_context_render(ctx);
 
-        /* Present texture via OpenGL from vendor gl_ext.h */
-        TINY_GL_PRESENT(window, fb, &rc, textureID);
+        /* Present using tinyGraphics' updated windowing backend. */
+        tinyWindowPresent(window);
     }
 
     /* Cleanup */
+    g_map_ctx = NULL;
+    g_window = NULL;
     tm_tilemap_destroy(tilemap);
     tm_vectormap_destroy(vmap);
     tm_context_destroy(ctx);
+    tinyDestroyWindow(window);
     destroyFrameBuffer(fb);
-    glfwDestroyWindow(window);
-    glfwTerminate();
 
     return 0;
 }

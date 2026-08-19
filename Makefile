@@ -40,6 +40,7 @@ TG_SRCS       = $(VENDOR_DIR)/graphics.c \
                 $(VENDOR_DIR)/scene_context.c \
                 $(wildcard $(VENDOR_DIR)/src/*.c) \
                 $(wildcard $(VENDOR_DIR)/src/events/*.c) \
+                $(wildcard $(VENDOR_DIR)/src/window/*.c) \
                 $(wildcard $(VENDOR_DIR)/src/math/*.c) \
                 $(wildcard $(VENDOR_DIR)/src/utils/*.c) \
                 $(wildcard $(VENDOR_DIR)/src/2D/*.c) \
@@ -72,7 +73,7 @@ shared: $(SHARED_LIB)
 
 $(SHARED_LIB): $(ALL_OBJS) | $(LIB_DIR)
 	@echo "[CC] Creating shared library: $@"
-	@$(CC) -shared $(LDFLAGS) -o $@ $^ -lm
+	@$(CC) -shared $(LDFLAGS) -o $@ $^ $(LIBS)
 
 # Object compilation rules for tinyMap sources
 $(OBJ_DIR)/tm/%.o: $(SRC_DIR)/%.c

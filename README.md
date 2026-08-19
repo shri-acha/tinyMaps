@@ -14,7 +14,8 @@ A lightweight, dependency-light map rendering library in C built on top of [tiny
 - **Viewport & Camera Controls**: Coordinate conversions between world coordinates and screen space.
 - **High-level Map Context**: Coordinates background, grid overlays, tile layers, vectors, and 3D terrain into a unified frameBuffer.
 - **Static & Shared Libraries**: Builds `libtinymap.a` and `libtinymap.so`.
-- **OpenGL Display**: Uses `tinyGraphics`'s vendor `gl_ext.h` texture presentation macros (`TINY_GL_INIT_TEXTURE`, `TINY_GL_PRESENT`).
+- **OpenGL Display**: Uses `tinyGraphics`'s updated `tinyWindow` backend abstraction.
+- **Event-driven Navigation**: Uses `tinyGraphics`'s event queue so users can pan, zoom, and center the map from keyboard and mouse input.
 
 ---
 
@@ -69,6 +70,12 @@ tinyMap/
 ```c
 #include "tinymap.h"
 
+static TM_MapContext *g_map_ctx;
+
+static void handle_event(Event e) {
+    tm_context_handle_event(g_map_ctx, e);
+}
+
 int main(void) {
     int width = 800, height = 600;
 
@@ -81,8 +88,10 @@ int main(void) {
         .projection = ORTHOGRAPHIC
     };
 
-    /* 2. Create tinyMap Context */
+    /* 2. Create tinyMap Context and register event navigation */
     TM_MapContext *map_ctx = tm_context_create(&rc, width, height);
+    g_map_ctx = map_ctx;
+    registerEventHandler(&rc, handle_event);
 
     /* 3. Create a 2D TileMap (40x30 tiles, 20px each) */
     TM_TileMap *tilemap = tm_tilemap_create(40, 30, 20, TM_MAP_ORTHOGONAL);
@@ -94,15 +103,24 @@ int main(void) {
     tm_vectormap_add_marker(vmap, (TM_Vec2){ 100.0f, 150.0f }, 5, TM_COLOR_MARKER);
     tm_context_set_vectormap(map_ctx, vmap);
 
-    /* 5. Render Scene */
-    tm_context_render(map_ctx);
+    /* 5. Open a tinyGraphics window and render interactively */
+    tinyWindow *window = tinyCreateWindow(tinyGetGLFWBackend(), width, height,
+                                          "tinyMap Example", &rc, NULL);
+    while (!tinyWindowShouldClose(window)) {
+        tm_context_render(map_ctx);
+        tinyWindowPresent(window);
+    }
 
     /* 6. Cleanup */
+    tinyDestroyWindow(window);
     tm_tilemap_destroy(tilemap);
     tm_vectormap_destroy(vmap);
+    g_map_ctx = NULL;
     tm_context_destroy(map_ctx);
     destroyFrameBuffer(rc.frame_buffer);
 
     return 0;
 }
 ```
+
+With the default GLFW backend, use the arrow keys or WASD to pan, `+`/`-` (or `=`/`_`) to zoom, left-click to center on a world position, and right-click to zoom in. Press `Escape` in the full demo to close the window.

@@ -27,6 +27,44 @@ void test_viewport(void) {
     printf("PASSED\n");
 }
 
+void test_viewport_events(void) {
+    printf("[Test] Event-driven Viewport Navigation... ");
+    TM_Viewport vp = tm_viewport_create(800, 600);
+    float start_center_x = vp.center.x;
+    float start_center_y = vp.center.y;
+
+    Event key_ev;
+    key_ev.ev_typ = KEYBOARD;
+    key_ev.ke.keycode = TM_KEY_RIGHT;
+    key_ev.ke.state = DOWN;
+    tm_viewport_handle_event(&vp, key_ev);
+    assert(vp.center.x > start_center_x);
+
+    key_ev.ke.keycode = TM_KEY_UP;
+    tm_viewport_handle_event(&vp, key_ev);
+    assert(vp.center.y < start_center_y);
+
+    float zoom_before = vp.zoom;
+    key_ev.ke.keycode = '+';
+    tm_viewport_handle_event(&vp, key_ev);
+    assert(vp.zoom > zoom_before);
+
+    TM_Viewport vp_before_mouse = vp;
+    Event mouse_ev;
+    mouse_ev.ev_typ = MOUSE;
+    mouse_ev.me.btn = LEFT;
+    mouse_ev.me.state = DOWN;
+    mouse_ev.me.pos = (Point2){ .x = 100, .y = 120 };
+
+    TM_Vec2 expected = tm_screen_to_world(&vp_before_mouse, mouse_ev.me.pos);
+    tm_viewport_handle_event(&vp, mouse_ev);
+
+    assert(fabsf(vp.center.x - expected.x) < 0.01f);
+    assert(fabsf(vp.center.y - expected.y) < 0.01f);
+
+    printf("PASSED\n");
+}
+
 void test_tilemap(void) {
     printf("[Test] TileMap Creation & Access... ");
     TM_TileMap *tm = tm_tilemap_create(10, 10, 16, TM_MAP_ORTHOGONAL);
@@ -121,6 +159,7 @@ void test_render_pipeline(void) {
 int main(void) {
     printf("\n=== Running tinyMap Test Suite ===\n");
     test_viewport();
+    test_viewport_events();
     test_tilemap();
     test_vectormap();
     test_heightmap();

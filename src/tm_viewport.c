@@ -29,6 +29,56 @@ void tm_viewport_center_on(TM_Viewport *vp, float x, float y) {
     vp->center.y = y;
 }
 
+void tm_viewport_handle_event(TM_Viewport *vp, Event e) {
+    if (!vp) return;
+
+    const float pan_step = 25.0f;
+    const float zoom_in_step = 1.10f;
+    const float zoom_out_step = 1.0f / zoom_in_step;
+
+    if (e.ev_typ == KEYBOARD && e.ke.state == DOWN) {
+        switch (e.ke.keycode) {
+            case TM_KEY_LEFT:
+            case 'a':
+            case 'A':
+                tm_viewport_pan(vp, -pan_step, 0.0f);
+                break;
+            case TM_KEY_RIGHT:
+            case 'd':
+            case 'D':
+                tm_viewport_pan(vp, pan_step, 0.0f);
+                break;
+            case TM_KEY_UP:
+            case 'w':
+            case 'W':
+                tm_viewport_pan(vp, 0.0f, -pan_step);
+                break;
+            case TM_KEY_DOWN:
+            case 's':
+            case 'S':
+                tm_viewport_pan(vp, 0.0f, pan_step);
+                break;
+            case '+':
+            case '=':
+                tm_viewport_zoom(vp, zoom_in_step);
+                break;
+            case '-':
+            case '_':
+                tm_viewport_zoom(vp, zoom_out_step);
+                break;
+            default:
+                break;
+        }
+    } else if (e.ev_typ == MOUSE && e.me.state == DOWN) {
+        TM_Vec2 world = tm_screen_to_world(vp, e.me.pos);
+        if (e.me.btn == LEFT) {
+            tm_viewport_center_on(vp, world.x, world.y);
+        } else if (e.me.btn == RIGHT) {
+            tm_viewport_zoom(vp, zoom_in_step);
+        }
+    }
+}
+
 Point2 tm_world_to_screen(const TM_Viewport *vp, TM_Vec2 world_pos) {
     Point2 pt;
     if (!vp) {
