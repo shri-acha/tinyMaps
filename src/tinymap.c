@@ -7,6 +7,8 @@ TM_MapContext* tm_context_create(renderContext *rc, int screen_w, int screen_h) 
 
     ctx->rc = rc;
     ctx->viewport = tm_viewport_create(screen_w, screen_h);
+    ctx->webtile_layer = NULL;
+    ctx->rastermap = NULL;
     ctx->tilemap = NULL;
     ctx->vectormap = NULL;
     ctx->heightmap = NULL;
@@ -20,6 +22,16 @@ TM_MapContext* tm_context_create(renderContext *rc, int screen_w, int screen_h) 
 void tm_context_destroy(TM_MapContext *ctx) {
     if (!ctx) return;
     free(ctx);
+}
+
+void tm_context_set_webtile_layer(TM_MapContext *ctx, TM_WebTileLayer *layer) {
+    if (!ctx) return;
+    ctx->webtile_layer = layer;
+}
+
+void tm_context_set_rastermap(TM_MapContext *ctx, TM_RasterMap *rastermap) {
+    if (!ctx) return;
+    ctx->rastermap = rastermap;
 }
 
 void tm_context_set_tilemap(TM_MapContext *ctx, TM_TileMap *tilemap) {
@@ -89,17 +101,27 @@ void tm_context_render(TM_MapContext *ctx) {
         render_grid(ctx->rc, &ctx->viewport, ctx->grid_spacing);
     }
 
-    /* 3. Render TileMap */
+    /* 3. Render Web Raster Tile Layer */
+    if (ctx->webtile_layer) {
+        tm_webtile_layer_render(ctx->rc, ctx->webtile_layer, &ctx->viewport);
+    }
+
+    /* 4. Render Local RasterMap Layer */
+    if (ctx->rastermap) {
+        tm_raster_render(ctx->rc, ctx->rastermap, &ctx->viewport);
+    }
+
+    /* 5. Render TileMap Layer */
     if (ctx->tilemap) {
         tm_tilemap_render(ctx->rc, ctx->tilemap, &ctx->viewport);
     }
 
-    /* 4. Render Vector Features */
+    /* 6. Render Vector Features */
     if (ctx->vectormap) {
         tm_vectormap_render(ctx->rc, ctx->vectormap, &ctx->viewport);
     }
 
-    /* 5. Render 3D Heightmap if present */
+    /* 7. Render 3D Heightmap if present */
     if (ctx->heightmap) {
         Point3 origin = { ctx->viewport.screen_w / 2, ctx->viewport.screen_h / 2, 0 };
         tm_heightmap_render_solid(ctx->rc, ctx->heightmap, origin, ctx->viewport.zoom);

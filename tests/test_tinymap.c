@@ -152,7 +152,217 @@ void test_render_pipeline(void) {
     tm_vectormap_destroy(vm);
     tm_context_destroy(ctx);
     destroyFrameBuffer(rc.frame_buffer);
-    destroyContext(NULL);
+    printf("PASSED\n");
+}
+
+void test_raster_basic(void) {
+    printf("[Test] RasterMap Creation & Manipulation... ");
+    TM_Bounds bounds = { 0.0f, 0.0f, 100.0f, 100.0f };
+    TM_RasterMap *raster = tm_raster_create(10, 10, bounds);
+    assert(raster != NULL);
+    assert(raster->width == 10);
+    assert(raster->height == 10);
+    assert(raster->opacity == 1.0f);
+
+    tm_raster_fill(raster, TM_COLOR_GRASS);
+    assert(tm_raster_get_pixel(raster, 0, 0).literal == TM_COLOR_GRASS.literal);
+    assert(tm_raster_get_pixel(raster, 9, 9).literal == TM_COLOR_GRASS.literal);
+
+    tm_raster_set_pixel(raster, 4, 4, TM_COLOR_WATER);
+    assert(tm_raster_get_pixel(raster, 4, 4).literal == TM_COLOR_WATER.literal);
+
+    tm_raster_set_opacity(raster, 0.5f);
+    assert(fabsf(raster->opacity - 0.5f) < 0.001f);
+
+    tm_raster_destroy(raster);
+    printf("PASSED\n");
+}
+
+void test_raster_ppm_io(void) {
+    printf("[Test] Raster PPM (P6/P3) File I/O... ");
+    TM_Bounds bounds = { 0.0f, 0.0f, 20.0f, 20.0f };
+    TM_RasterMap *orig = tm_raster_create(4, 4, bounds);
+    assert(orig != NULL);
+
+    tm_raster_set_pixel(orig, 0, 0, tm_color_rgb(255, 0, 0));
+    tm_raster_set_pixel(orig, 1, 0, tm_color_rgb(0, 255, 0));
+    tm_raster_set_pixel(orig, 2, 0, tm_color_rgb(0, 0, 255));
+    tm_raster_set_pixel(orig, 3, 0, tm_color_rgb(255, 255, 255));
+
+    const char *tmp_ppm = "/tmp/test_tinymap.ppm";
+    int save_res = tm_raster_save_ppm(orig, tmp_ppm);
+    assert(save_res == 0);
+
+    TM_RasterMap *loaded = tm_raster_load_ppm(tmp_ppm, bounds);
+    assert(loaded != NULL);
+    assert(loaded->width == 4);
+    assert(loaded->height == 4);
+
+    Color c0 = tm_raster_get_pixel(loaded, 0, 0);
+    Color c1 = tm_raster_get_pixel(loaded, 1, 0);
+    Color c2 = tm_raster_get_pixel(loaded, 2, 0);
+    assert(c0.literal == orig->pixels[0].literal);
+    assert(c1.literal == orig->pixels[1].literal);
+    assert(c2.literal == orig->pixels[2].literal);
+
+    tm_raster_destroy(orig);
+    tm_raster_destroy(loaded);
+    remove(tmp_ppm);
+    printf("PASSED\n");
+}
+
+void test_raster_bmp_io(void) {
+    printf("[Test] Raster BMP File I/O... ");
+    TM_Bounds bounds = { 10.0f, 20.0f, 110.0f, 120.0f };
+    TM_RasterMap *orig = tm_raster_create(8, 8, bounds);
+    assert(orig != NULL);
+
+    for (int y = 0; y < 8; y++) {
+        for (int x = 0; x < 8; x++) {
+            tm_raster_set_pixel(orig, x, y, tm_color_rgb((uint8_t)(x * 30), (uint8_t)(y * 30), 128));
+        }
+    }
+
+    const char *tmp_bmp = "/tmp/test_tinymap.bmp";
+    int save_res = tm_raster_save_bmp(orig, tmp_bmp);
+    assert(save_res == 0);
+
+    TM_RasterMap *loaded = tm_raster_load_bmp(tmp_bmp, bounds);
+    assert(loaded != NULL);
+    assert(loaded->width == 8);
+    assert(loaded->height == 8);
+
+    Color c_orig = tm_raster_get_pixel(orig, 3, 5);
+    Color c_load = tm_raster_get_pixel(loaded, 3, 5);
+    assert(c_orig.literal == c_load.literal);
+
+    tm_raster_destroy(orig);
+    tm_raster_destroy(loaded);
+    remove(tmp_bmp);
+    printf("PASSED\n");
+}
+
+void test_raster_asc_io(void) {
+    printf("[Test] Raster ESRI ASC / DEM Grid I/O... ");
+    const char *tmp_asc = "/tmp/test_tinymap.asc";
+    FILE *f = fopen(tmp_asc, "w");
+    assert(f != NULL);
+
+    fprintf(f, "ncols         4\n");
+    fprintf(f, "nrows         3\n");
+    fprintf(f, "xllcorner     100.0\n");
+    fprintf(f, "yllcorner     200.0\n");
+    fprintf(f, "cellsize      10.0\n");
+    fprintf(f, "NODATA_value  -9999\n");
+    fprintf(f, "10.0 20.0 30.0 40.0\n");
+    fprintf(f, "50.0 60.0 70.0 80.0\n");
+    fprintf(f, "90.0 100.0 -9999 120.0\n");
+    fclose(f);
+
+    TM_RasterMap *raster = tm_raster_load_asc(tmp_asc, 0.0f, 150.0f);
+    assert(raster != NULL);
+    assert(raster->width == 4);
+    assert(raster->height == 3);
+    assert(fabsf(raster->bounds.min_x - 100.0f) < 0.01f);
+    assert(fabsf(raster->bounds.max_x - 140.0f) < 0.01f);
+    assert(fabsf(raster->bounds.min_y - 200.0f) < 0.01f);
+    assert(fabsf(raster->bounds.max_y - 230.0f) < 0.01f);
+
+    TM_HeightMap *hm = tm_heightmap_from_asc(tmp_asc);
+    assert(hm != NULL);
+    assert(hm->cols == 4);
+    assert(hm->rows == 3);
+    assert(fabsf(tm_heightmap_get(hm, 1, 1) - 60.0f) < 0.01f);
+
+    tm_raster_destroy(raster);
+    tm_heightmap_destroy(hm);
+    remove(tmp_asc);
+    printf("PASSED\n");
+}
+
+void test_raster_render(void) {
+    printf("[Test] Raster Map Rendering... ");
+    int w = 60, h = 60;
+    renderContext rc;
+    rc.frame_buffer = createFrameBuffer(w, h);
+    rc.render_mode = FILLED;
+    rc.shading_mode = SHADE_NONE;
+    rc.projection = ORTHOGRAPHIC;
+    rc.origin = (Index){ 0, 0, 0 };
+    rc.scene_context = NULL;
+
+    TM_Viewport vp = tm_viewport_create(w, h);
+    TM_Bounds bounds = { 10.0f, 10.0f, 50.0f, 50.0f };
+    TM_RasterMap *raster = tm_raster_create(4, 4, bounds);
+    tm_raster_fill(raster, tm_color_rgb(200, 50, 100));
+
+    tm_raster_render(&rc, raster, &vp);
+
+    Point2 center_pt = { 30, 30 };
+    pixelBuffer p = get_pixel(rc.frame_buffer, center_pt.x, center_pt.y);
+    assert(p.color.literal != 0);
+
+    tm_raster_destroy(raster);
+    destroyFrameBuffer(rc.frame_buffer);
+    printf("PASSED\n");
+}
+
+void test_geo_coords(void) {
+    printf("[Test] Geographic & Tile Coordinate Math... ");
+    TM_GeoCoord london = { 51.5074, -0.1278 };
+    int zoom = 10;
+    TM_Vec2 world_pos = tm_geo_to_world(london, zoom);
+    assert(world_pos.x > 0.0f);
+    assert(world_pos.y > 0.0f);
+
+    TM_GeoCoord back_geo = tm_world_to_geo(world_pos, zoom);
+    assert(fabs(back_geo.lat - london.lat) < 0.01);
+    assert(fabs(back_geo.lon - london.lon) < 0.01);
+
+    TM_Bounds b = tm_tile_bounds(1, 0, 0);
+    assert(b.min_x == 0.0f);
+    assert(b.max_x == 256.0f);
+    assert(b.min_y == 0.0f);
+    assert(b.max_y == 256.0f);
+
+    printf("PASSED\n");
+}
+
+void test_webtile_fetch_and_layer(void) {
+    printf("[Test] Web Raster Tile Layer & Caching... ");
+    const char *test_cache = "/tmp/tinymap_test_tiles";
+    TM_WebTileLayer *layer = tm_webtile_layer_create(TM_TILE_CARTO_VOYAGER, test_cache);
+    assert(layer != NULL);
+
+    tm_webtile_layer_set_zoom(layer, 0);
+    tm_webtile_layer_set_opacity(layer, 0.9f);
+
+    /* Fetch world tile (0, 0, 0) */
+    TM_RasterMap *tile = tm_webtile_fetch(TM_TILE_CARTO_VOYAGER, 0, 0, 0, test_cache);
+    if (tile) {
+        assert(tile->width == 256);
+        assert(tile->height == 256);
+        tm_raster_destroy(tile);
+    }
+
+    /* Test layer render into framebuffer */
+    int w = 256, h = 256;
+    renderContext rc;
+    rc.frame_buffer = createFrameBuffer(w, h);
+    rc.render_mode = FILLED;
+    rc.shading_mode = SHADE_NONE;
+    rc.projection = ORTHOGRAPHIC;
+    rc.origin = (Index){ 0, 0, 0 };
+    rc.scene_context = NULL;
+
+    TM_Viewport vp = tm_viewport_create(w, h);
+    tm_viewport_center_on(&vp, 128.0f, 128.0f);
+
+    tm_webtile_layer_render(&rc, layer, &vp);
+
+    tm_webtile_layer_destroy(layer);
+    destroyFrameBuffer(rc.frame_buffer);
+
     printf("PASSED\n");
 }
 
@@ -164,6 +374,13 @@ int main(void) {
     test_vectormap();
     test_heightmap();
     test_render_pipeline();
+    test_raster_basic();
+    test_raster_ppm_io();
+    test_raster_bmp_io();
+    test_raster_asc_io();
+    test_raster_render();
+    test_geo_coords();
+    test_webtile_fetch_and_layer();
     printf("=== All Tests Passed Successfully! ===\n\n");
     return 0;
 }

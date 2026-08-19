@@ -40,7 +40,7 @@ int main(void) {
     registerEventHandler(&rc, handle_event);
 
     tinyWindow *window = tinyCreateWindow(tinyGetGLFWBackend(), WINDOW_WIDTH, WINDOW_HEIGHT,
-                                          "tinyMap - OpenGL Viewer", &rc, NULL);
+                                          "tinyMap - Web Raster Tile & Map Viewer", &rc, NULL);
     if (!window) {
         fprintf(stderr, "Failed to create window\n");
         destroyFrameBuffer(fb);
@@ -52,89 +52,69 @@ int main(void) {
     g_map_ctx = ctx;
     g_window = window;
 
-    /* 1. Create TileMap (40x30 tiles, 20px each) */
-    TM_TileMap *tilemap = tm_tilemap_create(40, 30, 20, TM_MAP_ORTHOGONAL);
-    tm_tilemap_fill(tilemap, 3); /* Grass */
+    /* Center camera on world map (or London / New York) */
+    tm_viewport_center_on(&ctx->viewport, 256.0f, 256.0f);
+    ctx->viewport.zoom = 1.0f;
 
-    /* Add a winding river and sand shores */
-    for (int r = 0; r < 30; r++) {
-        int c = 16 + (int)(sinf(r * 0.3f) * 5.0f);
-        tm_tilemap_set_tile(tilemap, c - 1, r, 2); /* Sand */
-        tm_tilemap_set_tile(tilemap, c,     r, 1); /* Water */
-        tm_tilemap_set_tile(tilemap, c + 1, r, 1); /* Water */
-        tm_tilemap_set_tile(tilemap, c + 2, r, 2); /* Sand */
-    }
+    /* 1. Add Live Web Raster Tile Layer (Free CartoDB Voyager / OSM Tiles) */
+    TM_WebTileLayer *webtiles = tm_webtile_layer_create(TM_TILE_CARTO_VOYAGER, ".cache/tinymap_tiles");
+    tm_webtile_layer_set_zoom(webtiles, 1);
+    tm_webtile_layer_set_opacity(webtiles, 1.0f);
+    tm_context_set_webtile_layer(ctx, webtiles);
 
-    /* Add paved roads */
-    for (int c = 0; c < 40; c++) {
-        tm_tilemap_set_tile(tilemap, c, 14, 5); /* Road */
-    }
-    for (int r = 0; r < 30; r++) {
-        tm_tilemap_set_tile(tilemap, 28, r, 5); /* Cross road */
-    }
-
-    tm_context_set_tilemap(ctx, tilemap);
-
-    /* 2. Add Vector Features (Highway, Markers, Buildings) */
+    /* 2. Add Vector Features Overlay (POI markers, routes) */
     TM_VectorMap *vmap = tm_vectormap_create(16);
 
-    /* Highway polyline */
-    TM_Vec2 highway[6] = {
-        { 40.0f, 50.0f },
-        { 180.0f, 120.0f },
-        { 380.0f, 150.0f },
-        { 550.0f, 320.0f },
-        { 700.0f, 450.0f },
-        { 760.0f, 550.0f }
+    /* Route Polyline */
+    TM_Vec2 route[5] = {
+        { 120.0f, 150.0f },
+        { 180.0f, 170.0f },
+        { 260.0f, 220.0f },
+        { 340.0f, 240.0f },
+        { 410.0f, 310.0f }
     };
-    tm_vectormap_add_line(vmap, highway, 6, TM_COLOR_HIGHWAY);
+    tm_vectormap_add_line(vmap, route, 5, TM_COLOR_HIGHWAY);
 
     /* City POI Markers */
-    tm_vectormap_add_marker(vmap, (TM_Vec2){ 180.0f, 120.0f }, 5, TM_COLOR_MARKER);
-    tm_vectormap_add_marker(vmap, (TM_Vec2){ 550.0f, 320.0f }, 5, TM_COLOR_MARKER);
-    tm_vectormap_add_marker(vmap, (TM_Vec2){ 560.0f, 280.0f }, 4, TM_COLOR_MARKER);
+    tm_vectormap_add_marker(vmap, (TM_Vec2){ 120.0f, 150.0f }, 6, TM_COLOR_MARKER);
+    tm_vectormap_add_marker(vmap, (TM_Vec2){ 260.0f, 220.0f }, 6, TM_COLOR_MARKER);
+    tm_vectormap_add_marker(vmap, (TM_Vec2){ 410.0f, 310.0f }, 6, TM_COLOR_MARKER);
 
-    /* Building Polygons */
-    TM_Vec2 bldg1[4] = {
-        { 600.0f, 180.0f },
-        { 680.0f, 180.0f },
-        { 680.0f, 240.0f },
-        { 600.0f, 240.0f }
+    /* Landmark Zone Polygon */
+    TM_Vec2 zone[4] = {
+        { 240.0f, 180.0f },
+        { 300.0f, 180.0f },
+        { 300.0f, 230.0f },
+        { 240.0f, 230.0f }
     };
-    tm_vectormap_add_polygon(vmap, bldg1, 4, TM_COLOR_MARKER, TM_COLOR_BUILDING, true);
-
-    TM_Vec2 bldg2[4] = {
-        { 620.0f, 80.0f },
-        { 720.0f, 80.0f },
-        { 720.0f, 140.0f },
-        { 620.0f, 140.0f }
-    };
-    tm_vectormap_add_polygon(vmap, bldg2, 4, TM_COLOR_MARKER, TM_COLOR_BUILDING, true);
+    tm_vectormap_add_polygon(vmap, zone, 4, TM_COLOR_MARKER, TM_COLOR_BUILDING, false);
 
     tm_context_set_vectormap(ctx, vmap);
 
-    printf("=========================================\n");
-    printf("  tinyMap OpenGL Viewer\n");
-    printf("  WASD / Arrow Keys : Pan\n");
-    printf("  +/-               : Zoom\n");
-    printf("  Left Click        : Center on position\n");
-    printf("  Right Click       : Zoom in\n");
+    printf("==================================================\n");
+    printf("  tinyMap - Live Web Raster Tile & Map Viewer\n");
+    printf("  Provider: CartoDB Voyager / OpenStreetMap\n");
+    printf("  ------------------------------------------------\n");
+    printf("  WASD / Arrow Keys : Pan Map\n");
+    printf("  +/-               : Zoom In / Zoom Out\n");
+    printf("  Left Click        : Center on Position\n");
+    printf("  Right Click       : Zoom In\n");
     printf("  ESC               : Quit\n");
-    printf("=========================================\n");
+    printf("==================================================\n");
 
     /* Main Render Loop */
     while (!tinyWindowShouldClose(window)) {
-        /* Render map to frameBuffer */
+        /* Render map layers (Web tiles -> Vectors) */
         tm_context_render(ctx);
 
-        /* Present using tinyGraphics' updated windowing backend. */
+        /* Present using tinyGraphics' windowing backend */
         tinyWindowPresent(window);
     }
 
     /* Cleanup */
     g_map_ctx = NULL;
     g_window = NULL;
-    tm_tilemap_destroy(tilemap);
+    tm_webtile_layer_destroy(webtiles);
     tm_vectormap_destroy(vmap);
     tm_context_destroy(ctx);
     tinyDestroyWindow(window);
