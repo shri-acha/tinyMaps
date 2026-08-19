@@ -12,7 +12,7 @@ TM_MapContext* tm_context_create(renderContext *rc, int screen_w, int screen_h) 
     ctx->tilemap = NULL;
     ctx->vectormap = NULL;
     ctx->heightmap = NULL;
-    ctx->background_color = tm_color_rgb(18, 20, 26);
+    ctx->background_color = tm_color_rgb(255, 255, 255);
     ctx->show_grid = false;
     ctx->grid_spacing = 32;
 

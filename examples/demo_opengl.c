@@ -54,12 +54,13 @@ int main(void) {
 
     /* Center camera on world map (or London / New York) */
     tm_viewport_center_on(&ctx->viewport, 256.0f, 256.0f);
-    ctx->viewport.zoom = 1.0f;
+    ctx->viewport.zoom = 2.0f;
 
     /* 1. Add Live Web Raster Tile Layer (Free CartoDB Voyager / OSM Tiles) */
     TM_WebTileLayer *webtiles = tm_webtile_layer_create(TM_TILE_CARTO_VOYAGER, ".cache/tinymap_tiles");
-    tm_webtile_layer_set_zoom(webtiles, 1);
+    tm_webtile_layer_set_zoom(webtiles, -1); /* Auto-select tile depth from viewport zoom */
     tm_webtile_layer_set_opacity(webtiles, 1.0f);
+    tm_webtile_layer_set_wrap_x(webtiles, true);
     tm_context_set_webtile_layer(ctx, webtiles);
 
     /* 2. Add Vector Features Overlay (POI markers, routes) */
@@ -96,7 +97,8 @@ int main(void) {
     printf("  Provider: CartoDB Voyager / OpenStreetMap\n");
     printf("  ------------------------------------------------\n");
     printf("  WASD / Arrow Keys : Pan Map\n");
-    printf("  +/-               : Zoom In / Zoom Out\n");
+    printf("  +/-               : Zoom In / Zoom Out (tiles re-render per level)\n");
+    printf("  Map              : Wraps endlessly east/west\n");
     printf("  Left Click        : Center on Position\n");
     printf("  Right Click       : Zoom In\n");
     printf("  ESC               : Quit\n");

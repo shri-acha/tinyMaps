@@ -11,7 +11,10 @@ A lightweight, dependency-light map rendering library in C built on top of [tiny
 - **Live Web Raster Tile Layer (Slippy Map / XYZ)**:
   - Fetches and caches free raster tiles from web providers (e.g. **CartoDB Voyager**, **CartoDB Positron**, **CartoDB Dark Matter**, **OpenStreetMap**, **OpenTopoMap**).
   - Built-in two-tier caching (in-memory LRU cache + persistent local disk cache `.cache/tinymap_tiles/`).
+  - Downloads missing tiles on a background worker thread, keeping map rendering and camera navigation non-blocking.
   - Automatically loads and renders visible tiles based on the current camera viewport and zoom level.
+  - In auto mode (`tm_webtile_layer_set_zoom(layer, -1)`), tile depth is derived from the viewport zoom and tiles are re-rendered automatically as the camera changes levels.
+  - Web tile layers wrap horizontally by default, so the map repeats endlessly east/west instead of stopping at the world edge. Use `tm_webtile_layer_set_wrap_x(layer, false)` to disable wrapping.
   - Full support for **WGS84 Latitude/Longitude** $\leftrightarrow$ **Web Mercator World Coordinates** transformations.
 - **Georeferenced Raster Files & Loaders**:
   - Support for **PNG**, **JPEG**, **BMP**, **TGA**, **PSD**, **GIF**, **PNM** (via embedded `stb_image`).

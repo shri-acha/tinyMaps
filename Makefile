@@ -30,9 +30,9 @@ INCLUDES      = -I$(INC_DIR) \
 
 # Compiler and Linker flags
 CFLAGS       ?= -Wall -Wextra -O2
-CFLAGS       += $(INCLUDES) -fPIC -MMD -MP
+CFLAGS       += $(INCLUDES) -fPIC -MMD -MP -pthread
 LDFLAGS      ?= 
-LIBS          = -lm -lglfw -lGL
+LIBS          = -lm -lglfw -lGL -pthread
 
 # Source discovery
 TM_SRCS       = $(wildcard $(SRC_DIR)/*.c)

@@ -127,14 +127,18 @@ typedef struct TM_CachedTile {
     struct TM_CachedTile *next;
 } TM_CachedTile;
 
+struct TM_WebTileWorker;
+
 typedef struct {
     char          url_template[256];
     char          cache_dir[256];
     int           fixed_zoom;
     float         opacity;
+    bool          wrap_x;
     TM_CachedTile *tile_cache;
     int           cache_count;
     int           max_cache_size;
+    struct TM_WebTileWorker *worker;
 } TM_WebTileLayer;
 
 TM_RasterMap*    tm_webtile_fetch(const char *url_template, int z, int x, int y, const char *cache_dir);
@@ -142,6 +146,7 @@ TM_WebTileLayer* tm_webtile_layer_create(const char *url_template, const char *c
 void             tm_webtile_layer_destroy(TM_WebTileLayer *layer);
 void             tm_webtile_layer_set_zoom(TM_WebTileLayer *layer, int zoom);
 void             tm_webtile_layer_set_opacity(TM_WebTileLayer *layer, float opacity);
+void             tm_webtile_layer_set_wrap_x(TM_WebTileLayer *layer, bool wrap_x);
 void             tm_webtile_layer_render(renderContext *rc, TM_WebTileLayer *layer, const TM_Viewport *vp);
 
 typedef enum {

@@ -38,12 +38,12 @@ TM_GeoCoord tm_world_to_geo(TM_Vec2 world, int zoom) {
 }
 
 TM_Bounds tm_tile_bounds(int z, int x, int y) {
-    (void)z;
+    float tile_size = 256.0f / (float)(1 << z);
     TM_Bounds b;
-    b.min_x = (float)(x * 256);
-    b.max_x = (float)((x + 1) * 256);
-    b.min_y = (float)(y * 256);
-    b.max_y = (float)((y + 1) * 256);
+    b.min_x = (float)x * tile_size;
+    b.max_x = (float)(x + 1) * tile_size;
+    b.min_y = (float)y * tile_size;
+    b.max_y = (float)(y + 1) * tile_size;
     return b;
 }
 

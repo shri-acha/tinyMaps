@@ -319,11 +319,17 @@ void test_geo_coords(void) {
     assert(fabs(back_geo.lat - london.lat) < 0.01);
     assert(fabs(back_geo.lon - london.lon) < 0.01);
 
-    TM_Bounds b = tm_tile_bounds(1, 0, 0);
-    assert(b.min_x == 0.0f);
-    assert(b.max_x == 256.0f);
-    assert(b.min_y == 0.0f);
-    assert(b.max_y == 256.0f);
+    TM_Bounds b0 = tm_tile_bounds(0, 0, 0);
+    assert(b0.min_x == 0.0f);
+    assert(b0.max_x == 256.0f);
+    assert(b0.min_y == 0.0f);
+    assert(b0.max_y == 256.0f);
+
+    TM_Bounds b1 = tm_tile_bounds(1, 0, 0);
+    assert(b1.min_x == 0.0f);
+    assert(b1.max_x == 128.0f);
+    assert(b1.min_y == 0.0f);
+    assert(b1.max_y == 128.0f);
 
     printf("PASSED\n");
 }
@@ -366,6 +372,107 @@ void test_webtile_fetch_and_layer(void) {
     printf("PASSED\n");
 }
 
+static void add_cached_tile_for_test(TM_WebTileLayer *layer, int z, int x, int y, Color color) {
+    TM_Bounds bounds = tm_tile_bounds(z, x, y);
+    TM_RasterMap *raster = tm_raster_create(4, 4, bounds);
+    assert(raster != NULL);
+    tm_raster_fill(raster, color);
+
+    TM_CachedTile *entry = (TM_CachedTile*)calloc(1, sizeof(TM_CachedTile));
+    assert(entry != NULL);
+    entry->z = z;
+    entry->x = x;
+    entry->y = y;
+    entry->raster = raster;
+    entry->next = layer->tile_cache;
+    layer->tile_cache = entry;
+    layer->cache_count++;
+}
+
+static void clear_frame_buffer(frameBuffer *fb) {
+    for (int i = 0; i < fb->width * fb->height; i++) {
+        fb->buffer[i].color.literal = 0;
+    }
+}
+
+static void assert_pixel_is_red(frameBuffer *fb, int x, int y) {
+    pixelBuffer p = get_pixel(fb, x, y);
+    uint8_t r = 0, g = 0, b = 0;
+    tm_color_to_rgb(p.color, &r, &g, &b);
+    assert(r > 200);
+    assert(g < 80);
+    assert(b < 80);
+}
+
+static void assert_pixel_is_green(frameBuffer *fb, int x, int y) {
+    pixelBuffer p = get_pixel(fb, x, y);
+    uint8_t r = 0, g = 0, b = 0;
+    tm_color_to_rgb(p.color, &r, &g, &b);
+    assert(r < 80);
+    assert(g > 200);
+    assert(b < 80);
+}
+
+static void assert_pixel_is_black(frameBuffer *fb, int x, int y) {
+    pixelBuffer p = get_pixel(fb, x, y);
+    assert(p.color.literal == 0);
+}
+
+void test_webtile_auto_depth_and_wrap(void) {
+    printf("[Test] Web Tile Auto Depth & Infinite Horizontal Wrapping... ");
+
+    TM_WebTileLayer *layer = tm_webtile_layer_create(TM_TILE_CARTO_VOYAGER, "/tmp/tinymap_test_tiles_depth");
+    assert(layer != NULL);
+    assert(layer->fixed_zoom == -1);
+    assert(layer->wrap_x == true);
+
+    int w = 64, h = 64;
+    renderContext rc;
+    rc.frame_buffer = createFrameBuffer(w, h);
+    rc.render_mode = FILLED;
+    rc.shading_mode = SHADE_NONE;
+    rc.projection = ORTHOGRAPHIC;
+    rc.origin = (Index){ 0, 0, 0 };
+    rc.scene_context = NULL;
+
+    TM_Viewport vp = tm_viewport_create(w, h);
+
+    /* Seed only the tiles needed by the renderer; no network is involved. */
+    add_cached_tile_for_test(layer, 0, 0, 0, tm_color_rgb(255, 0, 0));
+    add_cached_tile_for_test(layer, 1, 0, 0, tm_color_rgb(0, 255, 0));
+
+    /* Viewport zoom 1 selects depth 0. */
+    tm_viewport_center_on(&vp, 64.0f, 64.0f);
+    vp.zoom = 1.0f;
+    clear_frame_buffer(rc.frame_buffer);
+    tm_webtile_layer_render(&rc, layer, &vp);
+    assert_pixel_is_red(rc.frame_buffer, 32, 32);
+
+    /* Viewport zoom 2 selects depth 1 and re-renders using the next level. */
+    vp.zoom = 2.0f;
+    clear_frame_buffer(rc.frame_buffer);
+    tm_webtile_layer_render(&rc, layer, &vp);
+    assert_pixel_is_green(rc.frame_buffer, 32, 32);
+
+    /* Pan east past the world edge: the single depth-0 tile repeats. */
+    vp.zoom = 1.0f;
+    tm_viewport_center_on(&vp, 320.0f, 64.0f);
+    clear_frame_buffer(rc.frame_buffer);
+    tm_webtile_layer_render(&rc, layer, &vp);
+    assert_pixel_is_red(rc.frame_buffer, 32, 32);
+
+    /* Disabling horizontal wrapping restores the original edge-clamped view. */
+    tm_webtile_layer_set_wrap_x(layer, false);
+    assert(layer->wrap_x == false);
+    clear_frame_buffer(rc.frame_buffer);
+    tm_webtile_layer_render(&rc, layer, &vp);
+    assert_pixel_is_black(rc.frame_buffer, 32, 32);
+
+    tm_webtile_layer_destroy(layer);
+    destroyFrameBuffer(rc.frame_buffer);
+    printf("PASSED\n");
+}
+
 int main(void) {
     printf("\n=== Running tinyMap Test Suite ===\n");
     test_viewport();
@@ -381,6 +488,7 @@ int main(void) {
     test_raster_render();
     test_geo_coords();
     test_webtile_fetch_and_layer();
+    test_webtile_auto_depth_and_wrap();
     printf("=== All Tests Passed Successfully! ===\n\n");
     return 0;
 }
